@@ -210,6 +210,7 @@ function HostGamePage() {
 
                 <div className="flex flex-col items-center">
                     <span className="text-xs font-bold uppercase tracking-widest text-white/70">Question {currentQuestionIndex + 1} of {totalQuestions}</span>
+                    <span className="mt-1 text-sm font-bold bg-white text-[#3D3030] px-3 py-0.5 rounded shadow-sm tracking-widest">PIN: {pin}</span>
                 </div>
                     
                 <div className="flex items-center gap-4">
