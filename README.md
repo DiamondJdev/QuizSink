@@ -44,12 +44,8 @@ Detailed setup lives in docs/onboarding.md
 This project is optimized for containerized hosting.
 
 - **Self-Hosting**: Deploy on a VPS with Docker Compose using the `docker-compose.prod.yml` file.
-- **Render (Recommended)**:
-    1. Sign in to [Render](https://dashboard.render.com).
-    2. Click **New** > **Blueprint**.
-    3. Connect this repository.
-    4. Render will automatically detect the `render.yaml` and configure your services, including the persistent disk for your database.
-- **SQLite Persistence**: Ensure you mount a persistent volume to `/app/data` in the backend container to maintain your quiz data between restarts. (Handled automatically on Render via the blueprint).
+- **Self-Hosting**: Deploy on a VPS with Docker Compose using the `docker-compose.prod.yml` file.
+- **SQLite Persistence**: Ensure you mount a persistent volume to `/app/data` in the backend container to maintain your quiz data between restarts.
 - **CI/CD**: GitHub Actions automatically builds multi-arch images and pushes them to Docker Hub on every push to `main`.
 
 ## How We Work
