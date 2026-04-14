@@ -56,27 +56,24 @@ WORKDIR /app
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
 
-# Create non-root user for security
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nestjs -u 1001
+# Set production environment
+ENV NODE_ENV=production
 
 # Copy package files
 COPY package*.json ./
 
-# Copy production dependencies from builder
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
-
-# Copy built application from builder
-COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
+# Copy production dependencies and built output from builder
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
 
 # Copy .env.example as reference (actual .env should be provided at runtime)
-COPY --chown=nestjs:nodejs src/.env.example ./src/.env.example
+COPY src/.env.example ./src/.env.example
 
 # Create data directory with proper permissions
-RUN mkdir -p /app/data && chown -R nestjs:nodejs /app/data
+RUN mkdir -p /app/data && chown -R node:node /app/data
 
-# Switch to non-root user
-USER nestjs
+# Use the non-root node user
+USER node
 
 # Expose port
 EXPOSE 5200
