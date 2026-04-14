@@ -1,12 +1,21 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect, useRef } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+} from "react";
 import { io, Socket } from "socket.io-client";
 import { Question } from "@/components/QuestionBuilder";
 import { Quiz } from "./QuizContext";
 import { useUser } from "./UserContext";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5200";
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5200";
 
 interface GameContextType {
   currentQuiz: Quiz | null;
@@ -33,6 +42,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [socketState, setSocketState] = useState<Socket | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const connectionPromiseRef = useRef<Promise<Socket> | null>(null);
   const { accessToken } = useUser();
 
   const getCurrentQuestion = (): Question | null => {
@@ -61,18 +71,23 @@ export function GameProvider({ children }: { children: ReactNode }) {
   };
 
   const connectSocket = useCallback((): Promise<Socket> => {
-    return new Promise((resolve, reject) => {
-      const token = accessToken || localStorage.getItem("quizsink_access_token");
-      if (!token) {
-        reject(new Error("Missing access token for socket connection"));
-        return;
-      }
+    const token = accessToken || localStorage.getItem("quizsink_access_token");
+    if (!token) {
+      return Promise.reject(
+        new Error("Missing access token for socket connection"),
+      );
+    }
 
-      if (socketRef.current && socketRef.current.connected) {
-        resolve(socketRef.current);
-        return;
-      }
+    if (socketRef.current && socketRef.current.connected) {
+      return Promise.resolve(socketRef.current);
+    }
 
+    // Reuse an in-progress connection rather than creating a second socket
+    if (connectionPromiseRef.current) {
+      return connectionPromiseRef.current;
+    }
+
+    const promise = new Promise<Socket>((resolve, reject) => {
       const socket = io(`${API_BASE_URL}/game`, {
         auth: { token },
         transports: ["websocket", "polling"],
@@ -82,25 +97,30 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
       socketRef.current = socket;
 
-      const cleanupError = (error: Error) => {
-        if (socketRef.current === socket) {
-          setSocketState(null);
-        }
-        reject(error);
-      };
-
       socket.once("connect", () => {
+        connectionPromiseRef.current = null;
         setSocketState(socket);
         resolve(socket);
       });
 
-      socket.once("connect_error", cleanupError);
+      socket.once("connect_error", (error: Error) => {
+        connectionPromiseRef.current = null;
+        if (socketRef.current === socket) {
+          socketRef.current = null;
+          setSocketState(null);
+        }
+        reject(error);
+      });
+
       socket.on("disconnect", () => {
         if (socketRef.current === socket) {
           setSocketState(null);
         }
       });
     });
+
+    connectionPromiseRef.current = promise;
+    return promise;
   }, [accessToken]);
 
   const disconnectSocket = useCallback(() => {
@@ -118,16 +138,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const response = await socket.timeout(8000).emitWithAck(event, payload);
       return response as T;
     },
-    [connectSocket]
+    [connectSocket],
   );
 
-  const onEvent = useCallback((event: string, handler: (...args: unknown[]) => void) => {
-    socketRef.current?.on(event, handler as (...args: unknown[]) => void);
-  }, []);
+  const onEvent = useCallback(
+    (event: string, handler: (...args: unknown[]) => void) => {
+      socketRef.current?.on(event, handler as (...args: unknown[]) => void);
+    },
+    [],
+  );
 
-  const offEvent = useCallback((event: string, handler: (...args: unknown[]) => void) => {
-    socketRef.current?.off(event, handler as (...args: unknown[]) => void);
-  }, []);
+  const offEvent = useCallback(
+    (event: string, handler: (...args: unknown[]) => void) => {
+      socketRef.current?.off(event, handler as (...args: unknown[]) => void);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!accessToken) return;
